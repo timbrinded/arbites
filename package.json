@@ -15,8 +15,8 @@
   },
   "scripts": {
     "start": "tsx src/bin.ts",
-    "build": "tsup && pnpm copy-package-json",
-    "build:ts": "tsup",
+    "build": "tsup --format esm && pnpm copy-package-json",
+    "build:ts": "tsup --format esm",
     "clean": "rimraf dist/*",
     "check": "tsc -b tsconfig.json",
     "test": "vitest run",
