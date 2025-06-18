@@ -1,4 +1,4 @@
-import { Effect, HashMap, Layer, Ref } from "effect"
+import { Effect, HashMap, Layer, Option, Ref } from "effect"
 import type { DexInfo, DexRegistry } from "./types.js"
 import { MOONBEAM_DEXES } from "./types.js"
 
@@ -10,9 +10,7 @@ export const makeDexRegistry = Effect.gen(function* () {
   const getDex = (name: string) =>
     Effect.gen(function* () {
       const registry = yield* Ref.get(registryRef)
-      return HashMap.get(registry, name)._tag === "Some"
-        ? HashMap.get(registry, name).value
-        : undefined
+      return Option.getOrUndefined(HashMap.get(registry, name))
     })
 
   const getAllDexes = () =>

@@ -8,7 +8,7 @@ export function computePoolAddress(
   factoryAddress: string,
   tokenA: Token,
   tokenB: Token,
-  initCodeHash: string = INIT_CODE_HASH,
+  initCodeHash: `0x${string}` = INIT_CODE_HASH as `0x${string}`,
 ): string {
   // Sort tokens
   const [token0, token1] = tokenA.address < tokenB.address ? [tokenA, tokenB] : [tokenB, tokenA]

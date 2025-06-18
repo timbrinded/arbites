@@ -5,7 +5,6 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as Effect from "effect/Effect"
 import { mainRun } from "./Cli.js"
 
-mainRun(process.argv).pipe(
-  Effect.provide(NodeContext.layer),
-  NodeRuntime.runMain({ disableErrorReporting: true }),
-)
+const program = mainRun(process.argv).pipe(Effect.provide(NodeContext.layer))
+
+NodeRuntime.runMain(program as Effect.Effect<void, any, never>, { disableErrorReporting: true })

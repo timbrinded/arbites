@@ -92,7 +92,9 @@ describe("ArbitrageService", () => {
       Effect.catchAll(() => Effect.succeed("Service started successfully")),
     )
 
-    const result = await Effect.runPromise(testEffect.pipe(Effect.scoped))
+    const result = await Effect.runPromise(
+      testEffect.pipe(Effect.scoped) as Effect.Effect<string | number | void, never, never>,
+    )
     expect(result).toBe("Service started successfully")
   })
 

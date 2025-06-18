@@ -1,4 +1,4 @@
-import { Data, Effect, Layer, Ref, SubscriptionRef } from "effect"
+import { Data, Effect, Layer, Ref, Stream, SubscriptionRef } from "effect"
 import type { Token } from "../blockchain/types.js"
 import type { ExecutionResult } from "../execution/ExecutionEngine.js"
 import type { ArbitrageOpportunity } from "../monitoring/types.js"
@@ -41,13 +41,24 @@ export class ActivityEntry extends Data.Class<{
   readonly profit?: bigint
 }> {
   static create(type: "success" | "failure" | "info", message: string, profit?: bigint) {
-    return new ActivityEntry({
+    const entry: {
+      id: string
+      timestamp: Date
+      type: "success" | "failure" | "info"
+      message: string
+      profit?: bigint
+    } = {
       id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
       timestamp: new Date(),
       type,
       message,
-      profit,
-    })
+    }
+
+    if (profit !== undefined) {
+      entry.profit = profit
+    }
+
+    return new ActivityEntry(entry)
   }
 }
 
@@ -115,9 +126,28 @@ export const makeBotStateManager = () =>
     ) =>
       updateState((state) => ({
         ...state,
-        opportunities: state.opportunities.map((o) =>
-          o.opportunity === opportunity ? { ...o, status, reason, timestamp: new Date() } : o,
-        ),
+        opportunities: state.opportunities.map((o) => {
+          if (o.opportunity !== opportunity) return o
+
+          const props: {
+            id: string
+            opportunity: ArbitrageOpportunity
+            status: OpportunityStatus["status"]
+            reason?: string
+            timestamp: Date
+          } = {
+            id: o.id,
+            opportunity: o.opportunity,
+            status,
+            timestamp: new Date(),
+          }
+
+          if (reason !== undefined) {
+            props.reason = reason
+          }
+
+          return new OpportunityStatus(props)
+        }),
       }))
 
     const addExecutionResult = (result: ExecutionResult) =>
@@ -159,8 +189,8 @@ export const makeBotStateManager = () =>
 
     const getStateStream = () =>
       Effect.sync(() => {
-        // Just return the changes for now
-        return SubscriptionRef.changes(subscription)
+        // Return a stream that emits state changes
+        return Stream.fromEffect(SubscriptionRef.get(subscription))
       })
 
     return {

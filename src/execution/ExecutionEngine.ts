@@ -28,7 +28,13 @@ export interface ExecutionEngine {
   ) => Effect.Effect<readonly ExecutionResult[]>
 }
 
-export const makeExecutionEngine = (config: ExecutionConfig): Effect.Effect<ExecutionEngine> =>
+export const makeExecutionEngine = (
+  config: ExecutionConfig,
+): Effect.Effect<
+  ExecutionEngine,
+  never,
+  ViemConnectorLive | TransactionBuilderLive | DexRegistryLive
+> =>
   Effect.gen(function* () {
     const connector = yield* ViemConnectorLive
     const txBuilder = yield* TransactionBuilderLive
@@ -49,7 +55,7 @@ export const makeExecutionEngine = (config: ExecutionConfig): Effect.Effect<Exec
         if (!buyDex || !sellDex) {
           return {
             opportunity,
-            status: "failed",
+            status: "failed" as const,
             reason: "DEX not found in registry",
           }
         }
@@ -63,7 +69,7 @@ export const makeExecutionEngine = (config: ExecutionConfig): Effect.Effect<Exec
         if (currentGasPrice > config.maxGasPrice) {
           return {
             opportunity,
-            status: "skipped",
+            status: "skipped" as const,
             reason: `Gas price too high: ${currentGasPrice} > ${config.maxGasPrice}`,
           }
         }
@@ -99,13 +105,23 @@ export const makeExecutionEngine = (config: ExecutionConfig): Effect.Effect<Exec
         // Calculate actual profit (would need to parse logs in production)
         const actualProfit = opportunity.expectedProfit - swapTx.gasUsed * currentGasPrice
 
-        return {
-          opportunity,
-          approvalTx,
-          swapTx,
-          actualProfit,
-          status: "success",
-        }
+        const result: ExecutionResult =
+          approvalTx !== undefined
+            ? {
+                opportunity,
+                approvalTx,
+                swapTx,
+                actualProfit,
+                status: "success" as const,
+              }
+            : {
+                opportunity,
+                swapTx,
+                actualProfit,
+                status: "success" as const,
+              }
+
+        return result
       }).pipe(
         Effect.catchAll((error) =>
           Effect.succeed({

@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { type Address, encodeFunctionData, parseAbi } from "viem"
 import type { Token, Transaction } from "../blockchain/types.js"
 import type { ArbitrageOpportunity } from "../monitoring/types.js"
@@ -83,5 +83,5 @@ export class TransactionBuilderLive extends Effect.Tag("TransactionBuilder")<
   TransactionBuilderLive,
   TransactionBuilder
 >() {
-  static readonly Live = Effect.sync(makeTransactionBuilder)
+  static readonly Live = Layer.sync(this, makeTransactionBuilder)
 }

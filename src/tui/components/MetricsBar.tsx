@@ -14,11 +14,7 @@ const MetricBox: React.FC<{ label: string; value: string; subValue?: string }> =
   <Box flexDirection="column" paddingX={1}>
     <Text dimColor>{label}</Text>
     <Text bold>{value}</Text>
-    {subValue && (
-      <Text dimColor fontSize={12}>
-        {subValue}
-      </Text>
-    )}
+    {subValue && <Text dimColor>{subValue}</Text>}
   </Box>
 )
 

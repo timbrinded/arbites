@@ -5,7 +5,7 @@ import type { Token } from "../blockchain/types.js"
 import type { ExecutionResult } from "../execution/ExecutionEngine.js"
 import type { ArbitrageOpportunity } from "../monitoring/types.js"
 import { App } from "./App.js"
-import { BotStateManagerLive } from "./BotState.js"
+import { type BotState, BotStateManagerLive } from "./BotState.js"
 
 export interface TuiService {
   readonly start: () => Effect.Effect<void>
@@ -32,22 +32,22 @@ export const makeTuiService = () =>
         const initialState = yield* stateManager.getState()
 
         // Create a simple async iterable that polls the state
-        const asyncIterable = {
+        const asyncIterable: AsyncIterable<BotState> = {
           [Symbol.asyncIterator]: () => {
             let cancelled = false
             return {
-              async next() {
+              async next(): Promise<IteratorResult<BotState>> {
                 if (cancelled) {
-                  return { done: true, value: undefined }
+                  return { done: true, value: undefined as any }
                 }
                 // Poll state every 100ms
                 await new Promise((resolve) => setTimeout(resolve, 100))
                 const state = await Effect.runPromise(stateManager.getState())
                 return { done: false, value: state }
               },
-              return() {
+              return(): Promise<IteratorResult<BotState>> {
                 cancelled = true
-                return Promise.resolve({ done: true, value: undefined })
+                return Promise.resolve({ done: true, value: undefined as any })
               },
             }
           },

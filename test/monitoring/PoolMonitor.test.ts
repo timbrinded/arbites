@@ -95,7 +95,7 @@ describe("PoolMonitor", () => {
   const testLayer = PoolMonitorLive.Live.pipe(Layer.provide(MockConnectorLayer))
 
   const runTest = <A>(effect: Effect.Effect<A, any, PoolMonitorLive>) =>
-    Effect.runPromise(effect.pipe(Effect.provide(testLayer)))
+    Effect.runPromise(effect.pipe(Effect.provide(testLayer)) as Effect.Effect<A, any, never>)
 
   it("should add and update pools", async () => {
     const result = await runTest(
