@@ -1,10 +1,11 @@
-import { Console, type Duration, Effect, Layer, Schedule } from "effect"
+import { Console, type Duration, Effect, Layer, Ref, Schedule } from "effect"
 import { Token } from "../blockchain/types.js"
 import { ViemConnectorLive } from "../blockchain/ViemConnector.js"
 import type { ExecutionConfig } from "../execution/ExecutionEngine.js"
 import { ExecutionEngineLive } from "../execution/ExecutionEngine.js"
 import { PoolMonitorLive } from "../monitoring/PoolMonitor.js"
 import type { ArbitrageOpportunity } from "../monitoring/types.js"
+import { AssetInfo, ChainInfo, PoolInfo } from "../tui/BotState.js"
 import { TuiServiceLive } from "../tui/TuiService.js"
 
 export interface ArbitrageConfig {
@@ -21,9 +22,33 @@ export const makeArbitrageService = (config: ArbitrageConfig) =>
     const monitor = yield* PoolMonitorLive
     const tui = config.enableTui ? yield* TuiServiceLive : null
 
+    // Use dryRun to determine if we're in live mode
+    // dryRun = true means mock mode (no real trades)
+    // dryRun = false means live mode (real trades possible)
+    let isLive = !config.dryRun
+
     // Start TUI if enabled
     if (tui) {
       yield* tui.start()
+      yield* tui.setIsLive(isLive)
+
+      // Set up the go live callback - only allow if we have execution config
+      yield* Ref.set(tui.onGoLiveRequested, () =>
+        Effect.gen(function* () {
+          if (config.dryRun && !config.execution) {
+            yield* Console.log(
+              "Cannot go live: No execution config provided. Run with --private-key to enable live trading.",
+            )
+            return
+          }
+
+          yield* Console.log("Exiting dry run mode! Enabling live trading...")
+          isLive = true
+          yield* tui.setIsLive(true)
+
+          // Update status - no need to update chain info
+        }),
+      )
     }
 
     // Discover all pools from registered DEXs
@@ -66,6 +91,49 @@ export const makeArbitrageService = (config: ArbitrageConfig) =>
         }),
       ]
       yield* tui.updateAssets(commonTokens)
+
+      // Update chain info
+      const chainInfo = new ChainInfo({
+        chainId: 1284,
+        name: "Moonbeam",
+        latency: 0,
+        lastUpdated: new Date(),
+      })
+      yield* tui.updateChainInfo([chainInfo])
+
+      // Update asset info with mock or real balances
+      if (!isLive) {
+        // Mock data
+        const assetInfo = commonTokens.map(
+          (token) =>
+            new AssetInfo({
+              token,
+              balance: BigInt(Math.floor(Math.random() * 10000)) * BigInt(10 ** token.decimals),
+              priceUSD:
+                token.symbol === "USDC" || token.symbol === "USDT"
+                  ? 1.0
+                  : token.symbol === "DAI"
+                    ? 0.999
+                    : token.symbol === "WGLMR"
+                      ? 0.25
+                      : 1.02,
+              lastUpdated: new Date(),
+            }),
+        )
+        yield* tui.updateAssetInfo(assetInfo)
+      } else {
+        // TODO: Fetch real balances when live
+        const assetInfo = commonTokens.map(
+          (token) =>
+            new AssetInfo({
+              token,
+              balance: 0n, // Would fetch real balance
+              priceUSD: 1.0, // Would fetch real price
+              lastUpdated: new Date(),
+            }),
+        )
+        yield* tui.updateAssetInfo(assetInfo)
+      }
     } else {
       yield* Console.log(`Discovered ${poolCount} pools across all DEXs`)
     }
@@ -75,15 +143,52 @@ export const makeArbitrageService = (config: ArbitrageConfig) =>
         yield* Console.log("Updating pool data...")
       }
 
-      // Update all pool data
-      const poolInfos = yield* monitor.updatePools()
+      // Measure chain latency
+      const startTime = Date.now()
 
-      if (!tui) {
+      // Update all pool data (mock or real)
+      const poolInfos = isLive ? yield* monitor.updatePools() : yield* Effect.succeed([]) // Mock - no real pools
+
+      const latency = Date.now() - startTime
+
+      if (tui) {
+        // Update chain info with latency
+        const chainInfo = new ChainInfo({
+          chainId: 1284,
+          name: "Moonbeam",
+          latency: isLive ? latency : Math.floor(Math.random() * 50) + 10, // Mock latency 10-60ms
+          lastUpdated: new Date(),
+        })
+        yield* tui.updateChainInfo([chainInfo])
+
+        // Update pool info for TUI
+        const poolData = poolInfos.slice(0, 50).map((pool) => {
+          const tvl = calculateTVL({
+            tokenA: pool.reserves.token0,
+            tokenB: pool.reserves.token1,
+            reserveA: pool.reserves.reserve0,
+            reserveB: pool.reserves.reserve1,
+          })
+          return new PoolInfo({
+            id: `${pool.dexName}-${pool.address.slice(0, 8)}`,
+            dex: pool.dexName,
+            tokenA: pool.reserves.token0,
+            tokenB: pool.reserves.token1,
+            reserveA: pool.reserves.reserve0,
+            reserveB: pool.reserves.reserve1,
+            tvlUSD: tvl,
+            lastUpdated: pool.lastUpdate,
+          })
+        })
+        yield* tui.updatePoolInfo(poolData)
+      } else {
         yield* Console.log(`Updated ${poolInfos.length} pools`)
       }
 
-      // Find arbitrage opportunities
-      const opportunities = yield* monitor.findArbitrageOpportunities(config.minProfitPercentage)
+      // Find arbitrage opportunities (mock or real)
+      const opportunities = isLive
+        ? yield* monitor.findArbitrageOpportunities(config.minProfitPercentage)
+        : [] // No opportunities in mock mode
 
       if (opportunities.length === 0) {
         if (!tui) {
@@ -102,7 +207,8 @@ export const makeArbitrageService = (config: ArbitrageConfig) =>
           })
         }
 
-        if (!config.dryRun && config.execution) {
+        // Only execute trades if we're live (not in dry run) and have execution config
+        if (isLive && config.execution) {
           const executionEngine = yield* ExecutionEngineLive
 
           // Update opportunity status in TUI
@@ -129,8 +235,12 @@ export const makeArbitrageService = (config: ArbitrageConfig) =>
               { concurrency: "unbounded" },
             )
           }
-        } else if (!config.dryRun && !tui) {
-          yield* Console.log("Execution config not provided, skipping trades")
+        } else if (isLive && !config.execution) {
+          yield* Console.log("Live mode but no execution config provided, skipping trades")
+        } else if (!isLive && opportunities.length > 0) {
+          if (!tui) {
+            yield* Console.log("Dry run mode - would execute trades but skipping")
+          }
         }
       }
     })
@@ -153,6 +263,30 @@ const logOpportunity = (opp: ArbitrageOpportunity) =>
     `Opportunity: Buy ${opp.tokenIn.symbol} on ${opp.buyDex}, ` +
       `sell on ${opp.sellDex} for ${opp.profitPercentage.toFixed(2)}% profit`,
   )
+
+const calculateTVL = (pool: {
+  tokenA: Token
+  tokenB: Token
+  reserveA: bigint
+  reserveB: bigint
+}) => {
+  // Simple TVL calculation assuming token prices
+  const tokenPrices: Record<string, number> = {
+    USDC: 1.0,
+    USDT: 1.0,
+    DAI: 0.999,
+    WGLMR: 0.25,
+    FRAX: 1.02,
+  }
+
+  const priceA = tokenPrices[pool.tokenA.symbol] || 1.0
+  const priceB = tokenPrices[pool.tokenB.symbol] || 1.0
+
+  const valueA = (Number(pool.reserveA) / 10 ** pool.tokenA.decimals) * priceA
+  const valueB = (Number(pool.reserveB) / 10 ** pool.tokenB.decimals) * priceB
+
+  return valueA + valueB
+}
 
 export class ArbitrageServiceLive extends Effect.Tag("ArbitrageService")<
   ArbitrageServiceLive,

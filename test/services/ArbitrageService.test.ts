@@ -93,7 +93,7 @@ describe("ArbitrageService", () => {
     )
 
     const result = await Effect.runPromise(
-      testEffect.pipe(Effect.scoped) as Effect.Effect<string | number | void, never, never>,
+      testEffect.pipe(Effect.scoped) as Effect.Effect<string | number | undefined, never, never>,
     )
     expect(result).toBe("Service started successfully")
   })

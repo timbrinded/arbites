@@ -1,8 +1,8 @@
 import { Box, useApp, useInput } from "ink"
-import React from "react"
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import type { BotState } from "./BotState.js"
 import { ActivityLog } from "./components/ActivityLog.js"
+import { ExpandedView } from "./components/ExpandedView.js"
 import { Header } from "./components/Header.js"
 import { MetricsBar } from "./components/MetricsBar.js"
 import { OpportunitiesView } from "./components/OpportunitiesView.js"
@@ -12,6 +12,8 @@ interface AppProps {
   onPause: () => void
   onResume: () => void
   onQuit: () => void
+  onToggleExpand: (view: BotState["expandedView"]) => void
+  onGoLive: () => void
   stateStream: AsyncIterable<BotState>
 }
 
@@ -20,6 +22,8 @@ export const App: React.FC<AppProps> = ({
   onPause,
   onResume,
   onQuit,
+  onToggleExpand,
+  onGoLive,
   stateStream,
 }) => {
   const { exit } = useApp()
@@ -56,15 +60,37 @@ export const App: React.FC<AppProps> = ({
       if (state.status === "paused") {
         onResume()
       }
+    } else if (input === "g" || input === "G") {
+      if (!state.isLive) {
+        onGoLive()
+      }
+    } else if (input === "c" || input === "C") {
+      onToggleExpand(state.expandedView === "chains" ? "none" : "chains")
+    } else if (input === "a" || input === "A") {
+      onToggleExpand(state.expandedView === "assets" ? "none" : "assets")
+    } else if (input === "l" || input === "L") {
+      onToggleExpand(state.expandedView === "pools" ? "none" : "pools")
     }
   })
 
   return (
     <Box flexDirection="column" gap={1}>
-      <Header status={state.status} />
+      <Header status={state.status} expandedView={state.expandedView} isLive={state.isLive} />
       <MetricsBar metrics={state.metrics} />
-      <OpportunitiesView opportunities={state.opportunities} />
-      <ActivityLog activities={state.activityHistory} />
+      {state.expandedView === "none" ? (
+        <>
+          <OpportunitiesView opportunities={state.opportunities} />
+          <ActivityLog activities={state.activityHistory} />
+        </>
+      ) : (
+        <ExpandedView
+          view={state.expandedView}
+          chains={state.chains}
+          assets={state.assets}
+          pools={state.pools}
+          isLive={state.isLive}
+        />
+      )}
     </Box>
   )
 }

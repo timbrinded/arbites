@@ -62,11 +62,41 @@ export class ActivityEntry extends Data.Class<{
   }
 }
 
+export class ChainInfo extends Data.Class<{
+  readonly chainId: number
+  readonly name: string
+  readonly latency: number // milliseconds
+  readonly lastUpdated: Date
+}> {}
+
+export class AssetInfo extends Data.Class<{
+  readonly token: Token
+  readonly balance: bigint
+  readonly priceUSD: number
+  readonly lastUpdated: Date
+}> {}
+
+export class PoolInfo extends Data.Class<{
+  readonly id: string
+  readonly dex: string
+  readonly tokenA: Token
+  readonly tokenB: Token
+  readonly reserveA: bigint
+  readonly reserveB: bigint
+  readonly tvlUSD: number
+  readonly lastUpdated: Date
+}> {}
+
 export interface BotState {
   readonly metrics: BotMetrics
   readonly status: "running" | "paused" | "stopped"
   readonly opportunities: readonly OpportunityStatus[]
   readonly activityHistory: readonly ActivityEntry[]
+  readonly chains: readonly ChainInfo[]
+  readonly assets: readonly AssetInfo[]
+  readonly pools: readonly PoolInfo[]
+  readonly expandedView: "none" | "chains" | "assets" | "pools"
+  readonly isLive: boolean
 }
 
 export const makeBotStateManager = () =>
@@ -87,6 +117,11 @@ export const makeBotStateManager = () =>
       status: "running",
       opportunities: [],
       activityHistory: [],
+      chains: [],
+      assets: [],
+      pools: [],
+      expandedView: "none",
+      isLive: false,
     })
 
     // Create a subscription ref for state changes
@@ -187,6 +222,20 @@ export const makeBotStateManager = () =>
 
     const setStatus = (status: BotState["status"]) => updateState((state) => ({ ...state, status }))
 
+    const setExpandedView = (view: BotState["expandedView"]) =>
+      updateState((state) => ({ ...state, expandedView: view }))
+
+    const setIsLive = (isLive: boolean) => updateState((state) => ({ ...state, isLive }))
+
+    const updateChains = (chains: readonly ChainInfo[]) =>
+      updateState((state) => ({ ...state, chains }))
+
+    const updateAssets = (assets: readonly AssetInfo[]) =>
+      updateState((state) => ({ ...state, assets }))
+
+    const updatePools = (pools: readonly PoolInfo[]) =>
+      updateState((state) => ({ ...state, pools }))
+
     const getStateStream = () =>
       Effect.sync(() => {
         // Return a stream that emits state changes
@@ -199,6 +248,11 @@ export const makeBotStateManager = () =>
       updateOpportunityStatus,
       addExecutionResult,
       setStatus,
+      setExpandedView,
+      setIsLive,
+      updateChains,
+      updateAssets,
+      updatePools,
       getStateStream,
       getState: () => Ref.get(stateRef),
     }

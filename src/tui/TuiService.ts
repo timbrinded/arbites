@@ -5,7 +5,13 @@ import type { Token } from "../blockchain/types.js"
 import type { ExecutionResult } from "../execution/ExecutionEngine.js"
 import type { ArbitrageOpportunity } from "../monitoring/types.js"
 import { App } from "./App.js"
-import { type BotState, BotStateManagerLive } from "./BotState.js"
+import {
+  type AssetInfo,
+  type BotState,
+  BotStateManagerLive,
+  type ChainInfo,
+  type PoolInfo,
+} from "./BotState.js"
 
 export interface TuiService {
   readonly start: () => Effect.Effect<void>
@@ -19,6 +25,11 @@ export interface TuiService {
     status: "testing" | "executing",
   ) => Effect.Effect<void>
   readonly getStatus: () => Effect.Effect<"running" | "paused" | "stopped">
+  readonly updateChainInfo: (chainInfo: readonly ChainInfo[]) => Effect.Effect<void>
+  readonly updateAssetInfo: (assetInfo: readonly AssetInfo[]) => Effect.Effect<void>
+  readonly updatePoolInfo: (poolInfo: readonly PoolInfo[]) => Effect.Effect<void>
+  readonly setIsLive: (isLive: boolean) => Effect.Effect<void>
+  readonly onGoLiveRequested: Ref.Ref<(() => Effect.Effect<void>) | null>
 }
 
 export const makeTuiService = () =>
@@ -26,6 +37,7 @@ export const makeTuiService = () =>
     const stateManager = yield* BotStateManagerLive
     const fiberRef = yield* Ref.make<Fiber.RuntimeFiber<void> | null>(null)
     const inkInstanceRef = yield* Ref.make<ReturnType<typeof render> | null>(null)
+    const goLiveCallbackRef = yield* Ref.make<(() => Effect.Effect<void>) | null>(null)
 
     const start = () =>
       Effect.gen(function* () {
@@ -68,6 +80,22 @@ export const makeTuiService = () =>
           // Exit the process
           process.exit(0)
         }
+        const onToggleExpand = (view: BotState["expandedView"]) =>
+          Effect.runSync(stateManager.setExpandedView(view))
+
+        const onGoLive = () => {
+          Effect.runSync(
+            Effect.gen(function* () {
+              const callback = yield* Ref.get(goLiveCallbackRef)
+              if (callback) {
+                yield* callback()
+              } else {
+                // If no callback is set, just update the state
+                yield* stateManager.setIsLive(true)
+              }
+            }),
+          )
+        }
 
         // Render the TUI
         const instance = render(
@@ -76,6 +104,8 @@ export const makeTuiService = () =>
             onPause,
             onResume,
             onQuit,
+            onToggleExpand,
+            onGoLive,
             stateStream: asyncIterable,
           }),
         )
@@ -127,6 +157,13 @@ export const makeTuiService = () =>
 
     const getStatus = () => stateManager.getState().pipe(Effect.map((state) => state.status))
 
+    const updateChainInfo = (chainInfo: readonly ChainInfo[]) =>
+      stateManager.updateChains(chainInfo)
+    const updateAssetInfo = (assetInfo: readonly AssetInfo[]) =>
+      stateManager.updateAssets(assetInfo)
+    const updatePoolInfo = (poolInfo: readonly PoolInfo[]) => stateManager.updatePools(poolInfo)
+    const setIsLive = (isLive: boolean) => stateManager.setIsLive(isLive)
+
     return {
       start,
       stop,
@@ -136,6 +173,11 @@ export const makeTuiService = () =>
       reportExecution,
       updateOpportunityStatus,
       getStatus,
+      updateChainInfo,
+      updateAssetInfo,
+      updatePoolInfo,
+      setIsLive,
+      onGoLiveRequested: goLiveCallbackRef,
     } satisfies TuiService
   })
 

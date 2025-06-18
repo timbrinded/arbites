@@ -28,6 +28,7 @@
       "style": {
         "noNonNullAssertion": "off",
         "useConst": "error",
+        "useImportType": "off",
         "useTemplate": "warn"
       },
       "complexity": {

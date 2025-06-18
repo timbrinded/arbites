@@ -1,6 +1,6 @@
 import * as Command from "@effect/cli/Command"
 import * as Options from "@effect/cli/Options"
-import { Console, Duration, Effect } from "effect"
+import { Console, Duration, Effect, Option } from "effect"
 import { ArbitrageServiceLive } from "./services/ArbitrageService.js"
 
 // Commands
@@ -17,9 +17,9 @@ const run = Command.make(
       Options.withDescription("Minimum profit percentage"),
       Options.withDefault("0.5"),
     ),
-    dryRun: Options.boolean("dry-run").pipe(
-      Options.withDescription("Run without executing trades"),
-      Options.withDefault(true),
+    live: Options.boolean("live").pipe(
+      Options.withDescription("Enable live trading (exit dry run mode)"),
+      Options.withDefault(false),
     ),
     tui: Options.boolean("tui").pipe(
       Options.withDescription("Enable Terminal User Interface"),
@@ -29,27 +29,51 @@ const run = Command.make(
       Options.withDescription("Moonbeam RPC URL"),
       Options.withDefault("https://rpc.api.moonbeam.network"),
     ),
+    privateKey: Options.text("private-key").pipe(
+      Options.withDescription("Private key for executing trades (enables live trading)"),
+      Options.optional,
+    ),
   },
-  ({ interval, minProfit, dryRun, tui, rpcUrl }) =>
+  ({ interval, minProfit, live, tui, rpcUrl, privateKey }) =>
     Effect.gen(function* () {
       if (!tui) {
         yield* Console.log("Starting Arbites - Arbitrage Trading Bot")
         yield* Console.log(`Update interval: ${interval}s`)
         yield* Console.log(`Minimum profit: ${minProfit}%`)
-        yield* Console.log(`Mode: ${dryRun ? "DRY RUN" : "LIVE TRADING"}`)
+        yield* Console.log(`Mode: ${live ? "LIVE TRADING" : "DRY RUN"}`)
+        yield* Console.log(
+          `Execution: ${Option.isSome(privateKey) ? "ENABLED" : "DISABLED (no private key)"}`,
+        )
       }
 
       // Keep the service running
       yield* Effect.never
     }).pipe(
       Effect.provide(
-        ArbitrageServiceLive.Live({
-          updateInterval: Duration.seconds(interval),
-          minProfitPercentage: parseFloat(minProfit),
-          moonbeamRpcUrl: rpcUrl,
-          dryRun,
-          enableTui: tui,
-        }),
+        ArbitrageServiceLive.Live(
+          Option.match(privateKey, {
+            onNone: () => ({
+              updateInterval: Duration.seconds(interval),
+              minProfitPercentage: parseFloat(minProfit),
+              moonbeamRpcUrl: rpcUrl,
+              dryRun: !live,
+              enableTui: tui,
+            }),
+            onSome: (pk) => ({
+              updateInterval: Duration.seconds(interval),
+              minProfitPercentage: parseFloat(minProfit),
+              moonbeamRpcUrl: rpcUrl,
+              dryRun: !live,
+              enableTui: tui,
+              execution: {
+                walletAddress: "0x0000000000000000000000000000000000000000", // TODO: derive from private key
+                privateKey: pk,
+                slippageTolerance: 50, // 0.5% = 50 basis points
+                maxGasPrice: BigInt("50000000000"), // 50 gwei
+              },
+            }),
+          }),
+        ),
       ),
     ),
 )
