@@ -1,6 +1,10 @@
 import { Duration, Effect, Layer } from "effect"
 import { describe, expect, it } from "vitest"
-import type { BlockchainConnector, PoolReserves, TransactionReceipt } from "../../src/blockchain/types.js"
+import type {
+  BlockchainConnector,
+  PoolReserves,
+  TransactionReceipt,
+} from "../../src/blockchain/types.js"
 import { Token } from "../../src/blockchain/types.js"
 import { PoolMonitorLive } from "../../src/monitoring/PoolMonitor.js"
 import { makeArbitrageService } from "../../src/services/ArbitrageService.js"
@@ -52,18 +56,20 @@ const mockConnector: BlockchainConnector = {
       route: ["0x0", "0x1"],
     }),
   estimateGas: () => Effect.succeed(100000n),
-  sendTransaction: () => Effect.succeed({
-    hash: "0x1234",
-    blockNumber: 1000n,
-    gasUsed: 50000n,
-    status: "success",
-  } satisfies TransactionReceipt),
-  waitForTransaction: () => Effect.succeed({
-    hash: "0x1234",
-    blockNumber: 1000n,
-    gasUsed: 50000n,
-    status: "success",
-  } satisfies TransactionReceipt),
+  sendTransaction: () =>
+    Effect.succeed({
+      hash: "0x1234",
+      blockNumber: 1000n,
+      gasUsed: 50000n,
+      status: "success",
+    } satisfies TransactionReceipt),
+  waitForTransaction: () =>
+    Effect.succeed({
+      hash: "0x1234",
+      blockNumber: 1000n,
+      gasUsed: 50000n,
+      status: "success",
+    } satisfies TransactionReceipt),
 }
 
 const MockConnectorLayer = Layer.succeed(

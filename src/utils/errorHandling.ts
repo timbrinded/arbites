@@ -1,9 +1,9 @@
 import { Effect, Match, Schedule } from "effect"
-import {
+import type {
   BlockchainError,
-  type ContractError,
-  type InsufficientLiquidityError,
-  type NetworkError,
+  ContractError,
+  InsufficientLiquidityError,
+  NetworkError,
 } from "../blockchain/types.js"
 import type { MonitoringError } from "../monitoring/types.js"
 
@@ -58,7 +58,12 @@ export const retryOnBlockchainError = <A, E>(effect: Effect.Effect<A, E | Blockc
   effect.pipe(
     Effect.retry({
       while: (error) => {
-        if (error && typeof error === "object" && "_tag" in error && error._tag === "BlockchainError") {
+        if (
+          error &&
+          typeof error === "object" &&
+          "_tag" in error &&
+          error._tag === "BlockchainError"
+        ) {
           // Retry blockchain errors up to 3 times
           return true
         }
