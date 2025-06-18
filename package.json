@@ -42,6 +42,7 @@
     "@effect/platform-node": "latest",
     "@effect/vitest": "latest",
     "@types/node": "^22.5.2",
+    "@types/react": "^19.1.8",
     "effect": "latest",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
@@ -58,6 +59,10 @@
   "dependencies": {
     "@effect/schema": "^0.75.5",
     "@polkadot-api/client": "^0.1.0",
+    "ink": "^6.0.0",
+    "ink-spinner": "^5.0.0",
+    "ink-table": "^3.1.0",
+    "react": "^19.1.0",
     "viem": "^2.31.3"
   },
   "lint-staged": {

@@ -34,8 +34,7 @@ export const makeExecutionEngine = (config: ExecutionConfig): Effect.Effect<Exec
     const txBuilder = yield* TransactionBuilderLive
     const dexRegistry = yield* DexRegistryLive
 
-    const checkAllowance = (_token: Token, _spender: string) =>
-      Effect.succeed(0n) // For now, assume we need approval
+    const checkAllowance = (_token: Token, _spender: string) => Effect.succeed(0n) // For now, assume we need approval
 
     const executeArbitrage = (opportunity: ArbitrageOpportunity): Effect.Effect<ExecutionResult> =>
       Effect.gen(function* () {

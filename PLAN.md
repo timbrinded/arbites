@@ -129,12 +129,12 @@ interface AIMemory {
 
 ## Implementation Phases
 
-### Phase 1: Foundation
+### Phase 1: Foundation ✅
 - Set up Effect service structure
 - Implement Viem connector for Moonbeam
 - Create basic pool monitoring for one DEX
 
-### Phase 2: Core Arbitrage
+### Phase 2: Core Arbitrage ✅
 - Multi-DEX monitoring
 - Simple arbitrage detection
 - Transaction execution
@@ -144,7 +144,45 @@ interface AIMemory {
 - Add evaluation framework
 - Performance tracking
 
-### Phase 4: Advanced Features
+### Phase 4: Terminal User Interface (TUI)
+- Real-time dashboard with system metrics
+- Balance and P&L tracking
+- Pool/chain/asset monitoring stats
+- Live opportunity detection and execution feedback
+- Transaction history viewer
+- Interactive controls (pause/resume, adjust parameters)
+
+#### TUI Layout
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Arbitrage Bot v1.0.0          Status: Running       [Q]uit [P]ause│
+├─────────────────────────────────────────────────────────────────┤
+│ Balance    │ P&L        │ Pools │ Chains │ Assets │ Opportunities│
+│ $10,250.42 │ +$250.42   │  45   │   1    │   5    │      3       │
+│            │ (+2.50%)   │       │        │        │              │
+├─────────────────────────────────────────────────────────────────┤
+│ Live Opportunities                                               │
+│ ┌──────────────────────────────────────────────────────────┐   │
+│ │ USDC→WGLMR  StellaSwap→BeamSwap  +0.45%  Testing...  ⟳  │   │
+│ │ DAI→USDT   BeamSwap→Solarflare   +0.32%  Waiting...     │   │
+│ │ WGLMR→FRAX StellaSwap→BeamSwap   +0.28%  Waiting...     │   │
+│ └──────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────┤
+│ Recent Activity                                                  │
+│ [10:45:23] ✓ Executed USDC→DAI for +$12.34 profit              │
+│ [10:44:01] ✗ Failed WGLMR→USDT - Gas price too high            │
+│ [10:42:15] ✓ Executed FRAX→USDC for +$8.91 profit             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### TUI Components
+1. **Header**: App name, status, controls
+2. **Metrics Bar**: Key performance indicators
+3. **Live Opportunities**: Real-time opportunity tracking with status
+4. **Activity Log**: Recent transactions and events
+5. **Controls**: Keyboard shortcuts for interaction
+
+### Phase 5: Advanced Features
 - Multi-hop arbitrage
 - Cross-chain preparation
 - Advanced AI strategies
