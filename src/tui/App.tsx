@@ -1,5 +1,5 @@
 import { Box, useApp, useInput } from "ink"
-import type React from "react"
+import React from "react"
 import { useEffect, useState } from "react"
 import type { BotState } from "./BotState.js"
 import { ActivityLog } from "./components/ActivityLog.js"
