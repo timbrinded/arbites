@@ -112,7 +112,7 @@ jobs:
       - name: Test CLI
         run: |
           cd dist
-          node bin.cjs test
+          node dist/bin.js test
 
   security:
     name: Security Audit

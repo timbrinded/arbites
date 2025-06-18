@@ -5,6 +5,9 @@
   "packageManager": "pnpm@9.10.0",
   "license": "MIT",
   "description": "A basic Effect CLI application",
+  "bin": {
+    "arbites": "./dist/bin.js"
+  },
   "repository": {
     "type": "git",
     "url": "<PLACEHOLDER>"
@@ -14,7 +17,8 @@
     "directory": "dist"
   },
   "scripts": {
-    "start": "tsx src/bin.ts",
+    "dev": "tsx src/bin.ts",
+    "start": "node dist/bin.js run --tui",
     "build": "tsup --format esm && pnpm copy-package-json",
     "build:ts": "tsup --format esm",
     "clean": "rimraf dist/*",
@@ -36,18 +40,18 @@
     "@changesets/changelog-github": "^0.5.0",
     "@changesets/cli": "^2.27.8",
     "@effect/cli": "latest",
-    "@effect/language-service": "^0.1.0",
+    "@effect/language-service": "^0.21.3",
     "@effect/platform": "latest",
     "@effect/platform-node": "latest",
     "@effect/vitest": "latest",
-    "@types/node": "^22.5.2",
+    "@types/node": "^24.0.3",
     "@types/react": "^19.1.8",
     "effect": "latest",
     "lint-staged": "^16.1.2",
     "tsup": "^8.2.4",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
-    "vitest": "^2.0.5"
+    "vitest": "^3.2.4"
   },
   "pnpm": {
     "patchedDependencies": {
@@ -57,6 +61,7 @@
   "dependencies": {
     "@effect/schema": "^0.75.5",
     "@polkadot-api/client": "^0.1.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "ink": "^6.0.0",
     "ink-spinner": "^5.0.0",
     "ink-table": "^3.1.0",
