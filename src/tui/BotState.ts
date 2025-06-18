@@ -1,4 +1,4 @@
-import { Data, Effect, Ref, Stream, SubscriptionRef, Layer } from "effect"
+import { Data, Effect, Layer, Ref, SubscriptionRef } from "effect"
 import type { Token } from "../blockchain/types.js"
 import type { ExecutionResult } from "../execution/ExecutionEngine.js"
 import type { ArbitrageOpportunity } from "../monitoring/types.js"
@@ -40,11 +40,7 @@ export class ActivityEntry extends Data.Class<{
   readonly message: string
   readonly profit?: bigint
 }> {
-  static create(
-    type: "success" | "failure" | "info",
-    message: string,
-    profit?: bigint
-  ) {
+  static create(type: "success" | "failure" | "info", message: string, profit?: bigint) {
     return new ActivityEntry({
       id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
       timestamp: new Date(),
@@ -115,23 +111,22 @@ export const makeBotStateManager = () =>
     const updateOpportunityStatus = (
       opportunity: ArbitrageOpportunity,
       status: OpportunityStatus["status"],
-      reason?: string
+      reason?: string,
     ) =>
       updateState((state) => ({
         ...state,
         opportunities: state.opportunities.map((o) =>
-          o.opportunity === opportunity
-            ? { ...o, status, reason, timestamp: new Date() }
-            : o
+          o.opportunity === opportunity ? { ...o, status, reason, timestamp: new Date() } : o,
         ),
       }))
 
     const addExecutionResult = (result: ExecutionResult) =>
       Effect.gen(function* () {
         const profit = result.actualProfit || 0n
-        const message = result.status === "success"
-          ? `Executed ${result.opportunity.tokenIn.symbol}→${result.opportunity.tokenOut.symbol} for +$${(Number(profit) / 1e6).toFixed(2)} profit`
-          : `Failed ${result.opportunity.tokenIn.symbol}→${result.opportunity.tokenOut.symbol} - ${result.reason || "Unknown error"}`
+        const message =
+          result.status === "success"
+            ? `Executed ${result.opportunity.tokenIn.symbol}→${result.opportunity.tokenOut.symbol} for +$${(Number(profit) / 1e6).toFixed(2)} profit`
+            : `Failed ${result.opportunity.tokenIn.symbol}→${result.opportunity.tokenOut.symbol} - ${result.reason || "Unknown error"}`
 
         yield* updateState((state) => ({
           ...state,
@@ -139,9 +134,14 @@ export const makeBotStateManager = () =>
             ...state.metrics,
             balance: state.metrics.balance + (result.status === "success" ? profit : 0n),
             profitLoss: state.metrics.profitLoss + (result.status === "success" ? profit : 0n),
-            profitLossPercentage: 
-              Number((state.metrics.profitLoss + (result.status === "success" ? profit : 0n)) * 10000n / state.metrics.initialBalance) / 100,
-            successfulTrades: state.metrics.successfulTrades + (result.status === "success" ? 1 : 0),
+            profitLossPercentage:
+              Number(
+                ((state.metrics.profitLoss + (result.status === "success" ? profit : 0n)) *
+                  10000n) /
+                  state.metrics.initialBalance,
+              ) / 100,
+            successfulTrades:
+              state.metrics.successfulTrades + (result.status === "success" ? 1 : 0),
             failedTrades: state.metrics.failedTrades + (result.status === "failed" ? 1 : 0),
           },
           activityHistory: [
@@ -149,21 +149,18 @@ export const makeBotStateManager = () =>
             ActivityEntry.create(
               result.status === "success" ? "success" : "failure",
               message,
-              result.status === "success" ? profit : undefined
+              result.status === "success" ? profit : undefined,
             ),
           ].slice(-20), // Keep last 20 entries
         }))
       })
 
-    const setStatus = (status: BotState["status"]) =>
-      updateState((state) => ({ ...state, status }))
+    const setStatus = (status: BotState["status"]) => updateState((state) => ({ ...state, status }))
 
-    const getStateStream = () => 
-      Effect.gen(function* () {
-        const currentState = yield* Ref.get(stateRef)
-        return SubscriptionRef.changes(subscription).pipe(
-          Stream.concat(Stream.make(currentState))
-        )
+    const getStateStream = () =>
+      Effect.sync(() => {
+        // Just return the changes for now
+        return SubscriptionRef.changes(subscription)
       })
 
     return {

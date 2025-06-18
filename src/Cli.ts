@@ -54,9 +54,10 @@ const run = Command.make(
     ),
 )
 
-const command = run.pipe(Command.withSubcommands([test]))
+// Create the main command with subcommands
+const command = Command.make("arbites").pipe(Command.withSubcommands([run, test]))
 
-export { run as cli }
+export { command as cli }
 
 export const mainRun = Command.run(command, {
   name: "Arbites - Polkadot Ecosystem Arbitrage Bot",

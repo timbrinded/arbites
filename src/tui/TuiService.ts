@@ -1,6 +1,6 @@
-import { Effect, Fiber, Layer, Ref, Stream } from "effect"
+import { Effect, Fiber, Layer, Ref } from "effect"
 import { render } from "ink"
-import React from "react"
+import * as React from "react"
 import type { Token } from "../blockchain/types.js"
 import type { ExecutionResult } from "../execution/ExecutionEngine.js"
 import type { ArbitrageOpportunity } from "../monitoring/types.js"
@@ -18,6 +18,7 @@ export interface TuiService {
     opportunity: ArbitrageOpportunity,
     status: "testing" | "executing",
   ) => Effect.Effect<void>
+  readonly getStatus: () => Effect.Effect<"running" | "paused" | "stopped">
 }
 
 export const makeTuiService = () =>
@@ -29,37 +30,44 @@ export const makeTuiService = () =>
     const start = () =>
       Effect.gen(function* () {
         const initialState = yield* stateManager.getState()
-        const stream = yield* stateManager.getStateStream()
-        const stateStream = yield* Effect.promise(() =>
-          Stream.toReadableStream(stream),
-        )
 
-        // Create async iterable from stream
+        // Create a simple async iterable that polls the state
         const asyncIterable = {
           [Symbol.asyncIterator]: () => {
-            const reader = stateStream.getReader()
+            let cancelled = false
             return {
               async next() {
-                const result = await reader.read()
-                if (result.done) {
+                if (cancelled) {
                   return { done: true, value: undefined }
                 }
-                return { done: false, value: result.value }
+                // Poll state every 100ms
+                await new Promise((resolve) => setTimeout(resolve, 100))
+                const state = await Effect.runPromise(stateManager.getState())
+                return { done: false, value: state }
+              },
+              return() {
+                cancelled = true
+                return Promise.resolve({ done: true, value: undefined })
               },
             }
           },
         }
 
-        const onPause = () => stateManager.setStatus("paused")
-        const onResume = () => stateManager.setStatus("running")
-        const onQuit = () =>
-          Effect.gen(function* () {
-            yield* stateManager.setStatus("stopped")
-            const inkInstance = yield* Ref.get(inkInstanceRef)
-            if (inkInstance) {
-              inkInstance.unmount()
-            }
-          })
+        const onPause = () => Effect.runSync(stateManager.setStatus("paused"))
+        const onResume = () => Effect.runSync(stateManager.setStatus("running"))
+        const onQuit = () => {
+          Effect.runSync(
+            Effect.gen(function* () {
+              yield* stateManager.setStatus("stopped")
+              const inkInstance = yield* Ref.get(inkInstanceRef)
+              if (inkInstance) {
+                inkInstance.unmount()
+              }
+            }),
+          )
+          // Exit the process
+          process.exit(0)
+        }
 
         // Render the TUI
         const instance = render(
@@ -117,6 +125,8 @@ export const makeTuiService = () =>
       status: "testing" | "executing",
     ) => stateManager.updateOpportunityStatus(opportunity, status)
 
+    const getStatus = () => stateManager.getState().pipe(Effect.map((state) => state.status))
+
     return {
       start,
       stop,
@@ -125,6 +135,7 @@ export const makeTuiService = () =>
       reportOpportunity,
       reportExecution,
       updateOpportunityStatus,
+      getStatus,
     } satisfies TuiService
   })
 

@@ -1,4 +1,3 @@
-import { Effect } from "effect"
 import { Box, useApp, useInput } from "ink"
 import type React from "react"
 import { useEffect, useState } from "react"
@@ -10,9 +9,9 @@ import { OpportunitiesView } from "./components/OpportunitiesView.js"
 
 interface AppProps {
   initialState: BotState
-  onPause: () => Effect.Effect<void>
-  onResume: () => Effect.Effect<void>
-  onQuit: () => Effect.Effect<void>
+  onPause: () => void
+  onResume: () => void
+  onQuit: () => void
   stateStream: AsyncIterable<BotState>
 }
 
@@ -47,14 +46,15 @@ export const App: React.FC<AppProps> = ({
   // Handle keyboard input
   useInput((input, _key) => {
     if (input === "q" || input === "Q") {
-      Effect.runPromise(onQuit()).then(() => exit())
+      onQuit()
+      exit()
     } else if (input === "p" || input === "P") {
       if (state.status === "running") {
-        Effect.runPromise(onPause())
+        onPause()
       }
     } else if (input === "r" || input === "R") {
       if (state.status === "paused") {
-        Effect.runPromise(onResume())
+        onResume()
       }
     }
   })

@@ -24,7 +24,11 @@ export const Header: React.FC<HeaderProps> = ({ status }) => {
             {statusText}
           </Text>
         </Text>
-        <Text dimColor>[Q]uit [P]ause [R]esume</Text>
+        <Text dimColor>
+          {status === "running" && "[Q]uit [P]ause"}
+          {status === "paused" && "[Q]uit [R]esume"}
+          {status === "stopped" && "Shutting down..."}
+        </Text>
       </Box>
     </Box>
   )

@@ -138,9 +138,13 @@ export const makeArbitrageService = (config: ArbitrageConfig) =>
     // Run the service on a schedule
     return yield* checkForOpportunities.pipe(
       Effect.repeat(Schedule.fixed(config.updateInterval)),
-      Effect.catchAllCause((cause) =>
-        Console.error("Arbitrage service error:", cause).pipe(Effect.as(void 0)),
-      ),
+      Effect.catchAllCause((cause) => {
+        if (!tui) {
+          return Console.error("Arbitrage service error:", cause).pipe(Effect.as(void 0))
+        }
+        // Don't log errors when TUI is active (they'll be shown in the UI)
+        return Effect.void
+      }),
     )
   })
 
@@ -154,8 +158,21 @@ export class ArbitrageServiceLive extends Effect.Tag("ArbitrageService")<
   ArbitrageServiceLive,
   {}
 >() {
-  static readonly Live = (config: ArbitrageConfig) =>
-    Layer.scoped(
+  static readonly Live = (config: ArbitrageConfig) => {
+    // First create the ViemConnector layer which is needed by other services
+    const viemLayer = ViemConnectorLive.Live({
+      rpcUrl: config.moonbeamRpcUrl,
+      chainId: 1284,
+    })
+
+    // Create the other layers
+    const poolMonitorLayer = PoolMonitorLive.Live.pipe(Layer.provide(viemLayer))
+    const executionLayer = config.execution
+      ? ExecutionEngineLive.Live(config.execution).pipe(Layer.provide(viemLayer))
+      : Layer.empty
+    const tuiLayer = config.enableTui ? TuiServiceLive.Live : Layer.empty
+
+    return Layer.scoped(
       this,
       Effect.gen(function* () {
         if (!config.enableTui) {
@@ -164,17 +181,6 @@ export class ArbitrageServiceLive extends Effect.Tag("ArbitrageService")<
         yield* makeArbitrageService(config).pipe(Effect.forkScoped)
         return {}
       }),
-    ).pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          PoolMonitorLive.Live,
-          ViemConnectorLive.Live({
-            rpcUrl: config.moonbeamRpcUrl,
-            chainId: 1284,
-          }),
-          config.execution ? ExecutionEngineLive.Live(config.execution) : Layer.empty,
-          config.enableTui ? TuiServiceLive.Live : Layer.empty,
-        ),
-      ),
-    )
+    ).pipe(Layer.provide(Layer.mergeAll(poolMonitorLayer, viemLayer, executionLayer, tuiLayer)))
+  }
 }
