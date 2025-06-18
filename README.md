@@ -99,7 +99,6 @@ This project uses:
 - **Biome** for linting and formatting
 - **TypeScript** for type safety
 - **Vitest** for testing
-- **Husky** for Git hooks
 - **GitHub Actions** for CI/CD
 
 ### Git Hooks

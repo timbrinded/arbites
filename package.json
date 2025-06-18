@@ -29,8 +29,7 @@
     "biome:ci": "biome ci .",
     "copy-package-json": "tsx scripts/copy-package-json.ts",
     "changeset-version": "changeset version && node scripts/version.mjs",
-    "changeset-publish": "pnpm build && TEST_DIST= pnpm vitest && changeset publish",
-    "prepare": "husky"
+    "changeset-publish": "pnpm build && TEST_DIST= pnpm vitest && changeset publish"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
@@ -44,7 +43,6 @@
     "@types/node": "^22.5.2",
     "@types/react": "^19.1.8",
     "effect": "latest",
-    "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
     "tsup": "^8.2.4",
     "tsx": "^4.19.1",

@@ -1,6 +1,6 @@
 import { Box, Text } from "ink"
 import Spinner from "ink-spinner"
-import type React from "react"
+import React from "react"
 import type { OpportunityStatus } from "../BotState.js"
 
 interface OpportunitiesViewProps {
