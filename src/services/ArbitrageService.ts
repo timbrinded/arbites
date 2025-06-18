@@ -1,5 +1,7 @@
 import { Console, type Duration, Effect, Layer, Schedule } from "effect"
 import { ViemConnectorLive } from "../blockchain/ViemConnector.js"
+import type { ExecutionConfig } from "../execution/ExecutionEngine.js"
+import { ExecutionEngineLive } from "../execution/ExecutionEngine.js"
 import { PoolMonitorLive } from "../monitoring/PoolMonitor.js"
 import type { ArbitrageOpportunity } from "../monitoring/types.js"
 
@@ -8,22 +10,16 @@ export interface ArbitrageConfig {
   readonly minProfitPercentage: number
   readonly moonbeamRpcUrl: string
   readonly dryRun: boolean
+  readonly execution?: ExecutionConfig
 }
 
 export const makeArbitrageService = (config: ArbitrageConfig) =>
   Effect.gen(function* () {
     const monitor = yield* PoolMonitorLive
 
-    // Add initial pools (this would come from config in production)
-    const pools = [
-      { address: "0xb13B281503F6ec8a837ae1A21e86d8C0E01Db08e", name: "StellaSwap" },
-      { address: "0x555B74dAFC4Ef3A5A1640041e3244460Dc7dE242", name: "BeamSwap" },
-      // Add more pools as needed
-    ]
-
-    yield* Effect.forEach(pools, (pool) => monitor.addPool(pool.address, pool.name), {
-      concurrency: "unbounded",
-    })
+    // Discover all pools from registered DEXs
+    const poolCount = yield* monitor.discoverAllPools()
+    yield* Console.log(`Discovered ${poolCount} pools across all DEXs`)
 
     const checkForOpportunities = Effect.gen(function* () {
       yield* Console.log("Updating pool data...")
@@ -43,9 +39,22 @@ export const makeArbitrageService = (config: ArbitrageConfig) =>
           concurrency: "unbounded",
         })
 
-        if (!config.dryRun) {
-          // TODO: Execute trades
-          yield* Console.log("Trade execution not yet implemented")
+        if (!config.dryRun && config.execution) {
+          const executionEngine = yield* ExecutionEngineLive
+          const results = yield* executionEngine.executeOpportunities(opportunities)
+
+          yield* Effect.forEach(
+            results,
+            (result) =>
+              Console.log(
+                `Execution result: ${result.status} - ` +
+                  `${result.opportunity.tokenIn.symbol} -> ${result.opportunity.tokenOut.symbol}` +
+                  (result.reason ? ` (${result.reason})` : ""),
+              ),
+            { concurrency: "unbounded" },
+          )
+        } else if (!config.dryRun) {
+          yield* Console.log("Execution config not provided, skipping trades")
         }
       }
     })
@@ -78,12 +87,15 @@ export class ArbitrageServiceLive extends Effect.Tag("ArbitrageService")<
         return {}
       }),
     ).pipe(
-      Layer.provide(PoolMonitorLive.Live),
       Layer.provide(
-        ViemConnectorLive.Live({
-          rpcUrl: config.moonbeamRpcUrl,
-          chainId: 1284,
-        }),
+        Layer.mergeAll(
+          PoolMonitorLive.Live,
+          ViemConnectorLive.Live({
+            rpcUrl: config.moonbeamRpcUrl,
+            chainId: 1284,
+          }),
+          config.execution ? ExecutionEngineLive.Live(config.execution) : Layer.empty,
+        ),
       ),
     )
 }

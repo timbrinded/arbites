@@ -55,3 +55,4 @@ pnpm vitest run test/YourTest.test.ts
 - The project uses pnpm patches for `@changesets/get-github-info`
 - When modifying the CLI, the main logic should go in `src/Cli.ts`
 - The Effect framework emphasizes type safety and functional composition - use pipes and effects rather than imperative code
+- Always run `pnpm lint:fix` after big changes so we automatically fix format

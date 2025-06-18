@@ -1,6 +1,9 @@
 import { Effect, HashMap, Layer, Ref } from "effect"
-import type { Token } from "../blockchain/types.js"
+import { Token } from "../blockchain/types.js"
 import { ViemConnectorLive } from "../blockchain/ViemConnector.js"
+import { DexRegistryLive } from "../dex/DexRegistry.js"
+import type { DexInfo } from "../dex/types.js"
+import { computePoolAddress, DEX_INIT_CODE_HASHES } from "../utils/poolAddress.js"
 import type { ArbitrageOpportunity, PoolInfo, PoolMonitor, PriceData } from "./types.js"
 import { MonitoringError } from "./types.js"
 
@@ -12,6 +15,7 @@ interface PoolEntry {
 
 export const makePoolMonitor = Effect.gen(function* () {
   const connector = yield* ViemConnectorLive
+  const dexRegistry = yield* DexRegistryLive
   const poolsRef = yield* Ref.make(HashMap.empty<string, PoolEntry>())
 
   const addPool = (poolAddress: string, dexName: string) =>
@@ -104,6 +108,56 @@ export const makePoolMonitor = Effect.gen(function* () {
       })
     })
 
+  const addPoolsFromDex = (dexInfo: DexInfo, tokenPairs: readonly [Token, Token][]) =>
+    Effect.gen(function* () {
+      // For each token pair, calculate the pool address
+      const poolAddresses = tokenPairs.map(([token0, token1]) => {
+        // Get the appropriate init code hash for this DEX
+        const initCodeHash =
+          DEX_INIT_CODE_HASHES[dexInfo.name.toLowerCase() as keyof typeof DEX_INIT_CODE_HASHES] ||
+          DEX_INIT_CODE_HASHES.stellaswap // Default to stellaswap if not found
+
+        const poolAddress = computePoolAddress(dexInfo.factoryAddress, token0, token1, initCodeHash)
+        return poolAddress
+      })
+
+      // Add all pools to monitoring
+      yield* Effect.forEach(poolAddresses, (address) => addPool(address, dexInfo.name), {
+        concurrency: 5,
+      })
+
+      return poolAddresses.length
+    })
+
+  const discoverAllPools = () =>
+    Effect.gen(function* () {
+      const allDexes = dexRegistry.getAllDexes()
+
+      // Common token pairs to monitor on Moonbeam
+      const commonTokens = [
+        { address: "0x818ec0A7Fe18Ff94269904fCED6AE3DaE6d6dC0b", symbol: "USDC", decimals: 6 },
+        { address: "0xeFAeeE334F0Fd1712f9a8cc375f427D9Cdd40d73", symbol: "USDT", decimals: 6 },
+        { address: "0x765277EebeCA2e31912C9946eAe1021199B39C61", symbol: "DAI", decimals: 18 },
+        { address: "0xAcc15dC74880C9944775448304B263D191c6077F", symbol: "WGLMR", decimals: 18 },
+        { address: "0x322E86852e492a7Ee17f28a78c663da38FB33bfb", symbol: "FRAX", decimals: 18 },
+      ].map((t) => Token.make({ ...t, chainId: 1284 }))
+
+      // Create pairs
+      const pairs: [Token, Token][] = []
+      for (let i = 0; i < commonTokens.length; i++) {
+        for (let j = i + 1; j < commonTokens.length; j++) {
+          pairs.push([commonTokens[i], commonTokens[j]])
+        }
+      }
+
+      // Add pools from all DEXs
+      const results = yield* Effect.forEach(allDexes, (dex) => addPoolsFromDex(dex, pairs), {
+        concurrency: 3,
+      })
+
+      return results.reduce((sum, count) => sum + count, 0)
+    })
+
   const findArbitrageOpportunities = (minProfitPercentage: number) =>
     Effect.gen(function* () {
       const pools = yield* Ref.get(poolsRef)
@@ -186,6 +240,7 @@ export const makePoolMonitor = Effect.gen(function* () {
     updatePools,
     getPrices,
     findArbitrageOpportunities,
+    discoverAllPools,
   } satisfies PoolMonitor
 })
 
@@ -213,5 +268,7 @@ function getPairKey(token0: Token, token1: Token): string {
 }
 
 export class PoolMonitorLive extends Effect.Tag("PoolMonitor")<PoolMonitorLive, PoolMonitor>() {
-  static readonly Live = Layer.effect(this, makePoolMonitor)
+  static readonly Live = Layer.effect(this, makePoolMonitor).pipe(
+    Layer.provide(DexRegistryLive.Live),
+  )
 }

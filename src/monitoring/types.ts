@@ -50,4 +50,6 @@ export interface PoolMonitor {
   readonly findArbitrageOpportunities: (
     minProfitPercentage: number,
   ) => Effect.Effect<readonly ArbitrageOpportunity[], MonitoringError>
+
+  readonly discoverAllPools: () => Effect.Effect<number, MonitoringError>
 }
