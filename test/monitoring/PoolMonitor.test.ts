@@ -1,24 +1,27 @@
 import { Effect, HashMap, Layer, Ref } from "effect"
 import { describe, expect, it } from "vitest"
-import type { BlockchainConnector, PoolReserves, Token } from "../../src/blockchain/types.js"
-import { BlockchainError } from "../../src/blockchain/types.js"
+import type {
+  BlockchainConnector,
+  PoolReserves,
+  TransactionReceipt,
+} from "../../src/blockchain/types.js"
+import { BlockchainError, Token } from "../../src/blockchain/types.js"
 import { PoolMonitorLive } from "../../src/monitoring/PoolMonitor.js"
-import type { PoolMonitor } from "../../src/monitoring/types.js"
 
 // Mock tokens for testing
-const USDC: Token = {
+const USDC = Token.make({
   address: "0x818ec0A7Fe18Ff94269904fCED6AE3DaE6d6dC0b",
   symbol: "USDC",
   decimals: 6,
   chainId: 1284,
-}
+})
 
-const WGLMR: Token = {
+const WGLMR = Token.make({
   address: "0xAcc15dC74880C9944775448304B263D191c6077F",
   symbol: "WGLMR",
   decimals: 18,
   chainId: 1284,
-}
+})
 
 // Mock blockchain connector for testing
 const makeMockConnector = () =>
@@ -54,7 +57,7 @@ const makeMockConnector = () =>
           const pools = yield* Ref.get(poolData)
           const pool = HashMap.get(pools, poolAddress)
           if (pool._tag === "None") {
-            return yield* Effect.fail(new BlockchainError("Pool not found"))
+            return yield* Effect.fail(new BlockchainError({ reason: "Pool not found" }))
           }
           return pool.value
         }),
@@ -66,7 +69,20 @@ const makeMockConnector = () =>
           route: ["0x0", "0x1"],
         }),
       estimateGas: () => Effect.succeed(100000n),
-      sendTransaction: () => Effect.succeed("0x1234"),
+      sendTransaction: () =>
+        Effect.succeed({
+          hash: "0x1234",
+          blockNumber: 1000n,
+          gasUsed: 50000n,
+          status: "success",
+        } satisfies TransactionReceipt),
+      waitForTransaction: () =>
+        Effect.succeed({
+          hash: "0x1234",
+          blockNumber: 1000n,
+          gasUsed: 50000n,
+          status: "success",
+        } satisfies TransactionReceipt),
     } satisfies BlockchainConnector
   })
 
@@ -78,7 +94,7 @@ const MockConnectorLayer = Layer.effect(
 describe("PoolMonitor", () => {
   const testLayer = PoolMonitorLive.Live.pipe(Layer.provide(MockConnectorLayer))
 
-  const runTest = <A, E>(effect: Effect.Effect<A, E, PoolMonitor | PoolMonitorLive>) =>
+  const runTest = <A>(effect: Effect.Effect<A, any, PoolMonitorLive>) =>
     Effect.runPromise(effect.pipe(Effect.provide(testLayer)))
 
   it("should add and update pools", async () => {

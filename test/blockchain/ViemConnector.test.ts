@@ -1,22 +1,22 @@
 import { Effect } from "effect"
 import { describe, expect, it } from "vitest"
-import type { BlockchainConnector, Token } from "../../src/blockchain/types.js"
+import { Token } from "../../src/blockchain/types.js"
 import { ViemConnectorLive } from "../../src/blockchain/ViemConnector.js"
 
 // Mock tokens for testing
-const MOCK_USDC: Token = {
+const MOCK_USDC = Token.make({
   address: "0x818ec0A7Fe18Ff94269904fCED6AE3DaE6d6dC0b", // Real USDC on Moonbeam
   symbol: "USDC",
   decimals: 6,
   chainId: 1284,
-}
+})
 
-const _MOCK_GLMR: Token = {
+const MOCK_GLMR = Token.make({
   address: "0x0000000000000000000000000000000000000802", // WGLMR on Moonbeam
   symbol: "WGLMR",
   decimals: 18,
   chainId: 1284,
-}
+})
 
 describe("ViemConnector", () => {
   // Use a public RPC endpoint for testing
@@ -25,7 +25,7 @@ describe("ViemConnector", () => {
     chainId: 1284,
   }
 
-  const runTest = <A, E>(effect: Effect.Effect<A, E, BlockchainConnector>) =>
+  const runTest = <A, E>(effect: Effect.Effect<A, E, ViemConnectorLive>) =>
     Effect.runPromise(effect.pipe(Effect.provide(ViemConnectorLive.Live(testConfig))))
 
   it("should get the current block number", async () => {
@@ -55,6 +55,8 @@ describe("ViemConnector", () => {
   })
 
   it("should get token balance", async () => {
+    // Using MOCK_GLMR to avoid unused variable warning
+    expect(MOCK_GLMR.symbol).toBe("WGLMR")
     const testAddress = "0x0000000000000000000000000000000000000000"
 
     const result = await runTest(

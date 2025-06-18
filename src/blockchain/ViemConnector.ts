@@ -2,8 +2,14 @@ import { Effect, Layer } from "effect"
 import { type Address, createPublicClient, createWalletClient, http, parseAbi } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import { moonbeam } from "viem/chains"
-import type { BlockchainConnector, PoolReserves, PriceQuote, Token, Transaction } from "./types.js"
-import { BlockchainError, InsufficientLiquidityError } from "./types.js"
+import type {
+  BlockchainConnector,
+  PoolReserves,
+  PriceQuote,
+  Transaction,
+  TransactionReceipt,
+} from "./types.js"
+import { ContractError, InsufficientLiquidityError, NetworkError, Token } from "./types.js"
 
 const ERC20_ABI = parseAbi([
   "function balanceOf(address) view returns (uint256)",
@@ -43,7 +49,8 @@ export const makeViemConnector = (
             const block = await publicClient.getBlockNumber()
             return block
           },
-          catch: (error) => new BlockchainError(`Failed to get block number: ${error}`),
+          catch: (error) =>
+            new NetworkError({ reason: "Failed to get block number", cause: error }),
         }),
 
       getBalance: (address: string, token?: Token) =>
@@ -64,7 +71,13 @@ export const makeViemConnector = (
               return balance
             }
           },
-          catch: (error) => new BlockchainError(`Failed to get balance: ${error}`),
+          catch: (_error) =>
+            new ContractError({
+              contractAddress: token?.address || "native",
+              method: "balanceOf",
+              reason: "Failed to get balance",
+              params: { address, token },
+            }),
         }),
 
       getPoolReserves: (poolAddress: string) =>
@@ -112,24 +125,30 @@ export const makeViemConnector = (
             ])
 
             return {
-              token0: {
+              token0: Token.make({
                 address: token0Address,
                 symbol: token0Symbol,
                 decimals: token0Decimals,
                 chainId: config.chainId,
-              },
-              token1: {
+              }),
+              token1: Token.make({
                 address: token1Address,
                 symbol: token1Symbol,
                 decimals: token1Decimals,
                 chainId: config.chainId,
-              },
+              }),
               reserve0: BigInt(reserves[0]),
               reserve1: BigInt(reserves[1]),
               fee: 30, // 0.3% for Uniswap V2
             } satisfies PoolReserves
           },
-          catch: (error) => new BlockchainError(`Failed to get pool reserves: ${error}`),
+          catch: (_error) =>
+            new ContractError({
+              contractAddress: poolAddress,
+              method: "getReserves",
+              reason: "Failed to get pool reserves",
+              params: { poolAddress },
+            }),
         }),
 
       getPriceQuote: (tokenIn: Token, tokenOut: Token, amountIn: bigint, dexAddress: string) =>
@@ -144,7 +163,11 @@ export const makeViemConnector = (
             })
 
             if (amounts.length < 2 || amounts[1] === 0n) {
-              throw new InsufficientLiquidityError("No liquidity for this trade")
+              throw new InsufficientLiquidityError({
+                tokenIn,
+                tokenOut,
+                requestedAmount: amountIn,
+              })
             }
 
             const outputAmount = amounts[1]
@@ -159,7 +182,12 @@ export const makeViemConnector = (
           },
           catch: (error) => {
             if (error instanceof InsufficientLiquidityError) return error
-            return new BlockchainError(`Failed to get price quote: ${error}`)
+            return new ContractError({
+              contractAddress: dexAddress,
+              method: "getAmountsOut",
+              reason: "Failed to get price quote",
+              params: { tokenIn, tokenOut, amountIn, dexAddress },
+            })
           },
         }),
 
@@ -173,7 +201,7 @@ export const makeViemConnector = (
             })
             return gas
           },
-          catch: (error) => new BlockchainError(`Failed to estimate gas: ${error}`),
+          catch: (error) => new NetworkError({ reason: "Failed to estimate gas", cause: error }),
         }),
 
       sendTransaction: (transaction: Transaction, privateKey: string) =>
@@ -193,9 +221,46 @@ export const makeViemConnector = (
               gas: transaction.gasLimit,
             })
 
-            return hash
+            // Wait for the transaction to be mined
+            const receipt = await publicClient.waitForTransactionReceipt({ hash })
+
+            return {
+              hash,
+              blockNumber: receipt.blockNumber,
+              gasUsed: receipt.gasUsed,
+              status: receipt.status === "success" ? "success" : "reverted",
+              logs: receipt.logs.map((log) => ({
+                address: log.address,
+                topics: log.topics,
+                data: log.data,
+              })),
+            } satisfies TransactionReceipt
           },
-          catch: (error) => new BlockchainError(`Failed to send transaction: ${error}`),
+          catch: (error) =>
+            new NetworkError({ reason: "Failed to send transaction", cause: error }),
+        }),
+      waitForTransaction: (txHash: string, confirmations = 1) =>
+        Effect.tryPromise({
+          try: async () => {
+            const receipt = await publicClient.waitForTransactionReceipt({
+              hash: txHash as `0x${string}`,
+              confirmations,
+            })
+
+            return {
+              hash: txHash,
+              blockNumber: receipt.blockNumber,
+              gasUsed: receipt.gasUsed,
+              status: receipt.status === "success" ? "success" : "reverted",
+              logs: receipt.logs.map((log) => ({
+                address: log.address,
+                topics: log.topics,
+                data: log.data,
+              })),
+            } satisfies TransactionReceipt
+          },
+          catch: (error) =>
+            new NetworkError({ reason: "Failed to wait for transaction", cause: error }),
         }),
     } satisfies BlockchainConnector
   })

@@ -1,4 +1,4 @@
-import type { Effect } from "effect"
+import { Data, type Effect } from "effect"
 import type { PoolReserves, Token } from "../blockchain/types.js"
 
 export interface ArbitrageOpportunity {
@@ -29,9 +29,11 @@ export interface PriceData {
   readonly poolAddress: string
 }
 
-export class MonitoringError extends Error {
-  readonly _tag = "MonitoringError"
-}
+export class MonitoringError extends Data.TaggedError("MonitoringError")<{
+  readonly reason: string
+  readonly poolAddress?: string
+  readonly cause?: unknown
+}> {}
 
 export interface PoolMonitor {
   readonly addPool: (poolAddress: string, dexName: string) => Effect.Effect<void, MonitoringError>

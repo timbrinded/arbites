@@ -13,6 +13,9 @@ importers:
 
   .:
     dependencies:
+      '@effect/schema':
+        specifier: ^0.75.5
+        version: 0.75.5(effect@3.16.8)
       '@polkadot-api/client':
         specifier: ^0.1.0
         version: 0.1.0(@substrate/connect@0.8.11)(postcss@8.5.6)(rxjs@7.8.2)(smoldot@2.0.26)(tsx@4.20.3)(yaml@2.8.0)
@@ -279,6 +282,12 @@ packages:
     peerDependencies:
       '@effect/platform': ^0.85.1
       effect: ^3.16.8
+
+  '@effect/schema@0.75.5':
+    resolution: {integrity: sha512-TQInulTVCuF+9EIbJpyLP6dvxbQJMphrnRqgexm/Ze39rSjfhJuufF7XvU3SxTgg3HnL7B/kpORTJbHhlE6thw==}
+    deprecated: this package has been merged into the main effect package
+    peerDependencies:
+      effect: ^3.9.2
 
   '@effect/sql@0.38.1':
     resolution: {integrity: sha512-oS5s8j8C1W7rugZeDpwfRjrjfRaqUqhO+wtL1yRgXqE0px7fVI3y2Am5f6aq63cR9UMKOwFc5NzEl3Af9uYlSw==}
@@ -2485,6 +2494,11 @@ snapshots:
     dependencies:
       '@effect/platform': 0.85.1(effect@3.16.8)
       effect: 3.16.8
+
+  '@effect/schema@0.75.5(effect@3.16.8)':
+    dependencies:
+      effect: 3.16.8
+      fast-check: 3.23.2
 
   '@effect/sql@0.38.1(@effect/experimental@0.49.1(@effect/platform@0.85.1(effect@3.16.8))(effect@3.16.8))(@effect/platform@0.85.1(effect@3.16.8))(effect@3.16.8)':
     dependencies:

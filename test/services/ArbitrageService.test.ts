@@ -1,23 +1,24 @@
 import { Duration, Effect, Layer } from "effect"
 import { describe, expect, it } from "vitest"
-import type { BlockchainConnector, PoolReserves, Token } from "../../src/blockchain/types.js"
+import type { BlockchainConnector, PoolReserves, TransactionReceipt } from "../../src/blockchain/types.js"
+import { Token } from "../../src/blockchain/types.js"
 import { PoolMonitorLive } from "../../src/monitoring/PoolMonitor.js"
 import { makeArbitrageService } from "../../src/services/ArbitrageService.js"
 
 // Mock tokens
-const USDC: Token = {
+const USDC = Token.make({
   address: "0x818ec0A7Fe18Ff94269904fCED6AE3DaE6d6dC0b",
   symbol: "USDC",
   decimals: 6,
   chainId: 1284,
-}
+})
 
-const WGLMR: Token = {
+const WGLMR = Token.make({
   address: "0xAcc15dC74880C9944775448304B263D191c6077F",
   symbol: "WGLMR",
   decimals: 18,
   chainId: 1284,
-}
+})
 
 // Mock blockchain connector
 const mockConnector: BlockchainConnector = {
@@ -51,7 +52,18 @@ const mockConnector: BlockchainConnector = {
       route: ["0x0", "0x1"],
     }),
   estimateGas: () => Effect.succeed(100000n),
-  sendTransaction: () => Effect.succeed("0x1234"),
+  sendTransaction: () => Effect.succeed({
+    hash: "0x1234",
+    blockNumber: 1000n,
+    gasUsed: 50000n,
+    status: "success",
+  } satisfies TransactionReceipt),
+  waitForTransaction: () => Effect.succeed({
+    hash: "0x1234",
+    blockNumber: 1000n,
+    gasUsed: 50000n,
+    status: "success",
+  } satisfies TransactionReceipt),
 }
 
 const MockConnectorLayer = Layer.succeed(
@@ -74,7 +86,7 @@ describe("ArbitrageService", () => {
       Effect.catchAll(() => Effect.succeed("Service started successfully")),
     )
 
-    const result = await Effect.runPromise(testEffect)
+    const result = await Effect.runPromise(testEffect.pipe(Effect.scoped))
     expect(result).toBe("Service started successfully")
   })
 

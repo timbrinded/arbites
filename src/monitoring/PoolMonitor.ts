@@ -43,7 +43,12 @@ export const makePoolMonitor = Effect.gen(function* () {
         { concurrency: 5 },
       ).pipe(
         Effect.catchAll((error) =>
-          Effect.fail(new MonitoringError(`Failed to update pools: ${error}`)),
+          Effect.fail(
+            new MonitoringError({
+              reason: "Failed to update pools",
+              cause: error,
+            }),
+          ),
         ),
       )
 
@@ -185,9 +190,9 @@ export const makePoolMonitor = Effect.gen(function* () {
 })
 
 function isSameToken(token1: Token, token2: Token): boolean {
+  // Token equality is now handled by Data.Class
   return (
-    token1.address.toLowerCase() === token2.address.toLowerCase() &&
-    token1.chainId === token2.chainId
+    token1 === token2 || (token1.address === token2.address && token1.chainId === token2.chainId)
   )
 }
 
@@ -203,10 +208,7 @@ function calculatePrice(
 }
 
 function getPairKey(token0: Token, token1: Token): string {
-  const [first, second] =
-    token0.address.toLowerCase() < token1.address.toLowerCase()
-      ? [token0, token1]
-      : [token1, token0]
+  const [first, second] = token0.address < token1.address ? [token0, token1] : [token1, token0]
   return `${first.address}-${second.address}`
 }
 
