@@ -67,7 +67,7 @@ const logOpportunity = (opp: ArbitrageOpportunity) =>
 
 export class ArbitrageServiceLive extends Effect.Tag("ArbitrageService")<
   ArbitrageServiceLive,
-  void
+  {}
 >() {
   static readonly Live = (config: ArbitrageConfig) =>
     Layer.scoped(
@@ -75,6 +75,7 @@ export class ArbitrageServiceLive extends Effect.Tag("ArbitrageService")<
       Effect.gen(function* () {
         yield* Console.log("Starting arbitrage service...")
         yield* makeArbitrageService(config).pipe(Effect.forkScoped)
+        return {}
       }),
     ).pipe(
       Layer.provide(PoolMonitorLive.Live),
